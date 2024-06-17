@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "sqlutil": {
+      "commandName": "Project",
+      "commandLineArgs": "export src_db exported.txt"
+    }
+  }
+}
