@@ -22,7 +22,7 @@ public static class Program
     private static int OneArg(string arg0)
     {
         // sqlutil list
-        if (arg0.ToLower() == "list")
+        if (arg0.ToLower() == "list_keys")
         {
             Console.WriteLine(String.Join("\n", Conn.List()));
             return 0;
@@ -35,7 +35,7 @@ public static class Program
     private static int TwoArgs(string arg0, string arg1)
     {
         // sqlutil wipe [key_name | db_conn]
-        if (arg0.ToLower() == "wipe")
+        if (arg0.ToLower() == "wipe_data")
         {
             var dbConn = Conn.Get(arg1);
             try
@@ -53,7 +53,7 @@ public static class Program
         }
 
         // sqlutil remove [key_name]
-        if (arg0.ToLower() == "remove")
+        if (arg0.ToLower() == "remove_key")
         {
             Console.WriteLine($"=> Removing {arg1}...");
             if (Conn.Remove(arg1))
@@ -64,7 +64,7 @@ public static class Program
         }
 
         // sqlutil test [key_name | db_conn]
-        if (arg0.ToLower() == "test")
+        if (arg0.ToLower() == "test_connection")
         {
             var dbConn = Conn.Get(arg1);
             try
@@ -89,7 +89,7 @@ public static class Program
     {
 
         // sqlutil add [key_name] [value]
-        if (arg0.ToLower() == "add")
+        if (arg0.ToLower() == "add_key")
         {
             Console.WriteLine($"=> Adding key {arg1} = {arg2} ...");
             Conn.Add(arg1, arg2);
@@ -98,7 +98,7 @@ public static class Program
         }
 
         // sqlutil export [src_key | src_conn_str] [output_file_path]
-        if (arg0.ToLower() == "export")
+        if (arg0.ToLower() == "export_data")
         {
             var sourceDb = Conn.Get(arg1);
             var filePath = arg2;
@@ -128,7 +128,7 @@ public static class Program
         }
 
         // sqlutil import [input_file_path] [tgt_key | tgt_conn_str]
-        if (arg0.ToLower() == "import")
+        if (arg0.ToLower() == "import_data")
         {
             var filePath = arg1;
             var targetDb = Conn.Get(arg2);
@@ -161,7 +161,7 @@ public static class Program
         }
 
         // sqlutil copy [src_key | src_conn_str] [tgt_key | tgt_conn_str]
-        if (arg0.ToLower() == "copy")
+        if (arg0.ToLower() == "copy_data")
         {
             var sourceDb = Conn.Get(arg1);
             var targetDb = Conn.Get(arg2);
@@ -208,41 +208,42 @@ public static class Program
     {
         Console.WriteLine(@"
 sqlutil <cmd> [options]
-    export [source_db] [output_file_path]
+
+    test_connection [key_name | full_connection_string]
+        tests connection to db, either by looking up its key_name or using the given string as a connection string
+
+    export_data [source_db] [output_file_path]
         copies all data from source_db and writes into file at output_file_path
         source_db = [key_name | full_connection_string]
 
-    import [input_file_path] [target_db]
+    import_data [input_file_path] [target_db]
         copies data from file at input_file_path and inserts it into the database at target_db
         will do so in a foreign-key aware order, so FK constraints do not need to be disabled or ignored
         target_db = [key_name | full_connection_string]
 
-    copy [source_db] [target_db]
-        copies data from source_db to target_db
-        this is the same as running the following commands:
-            sqlutil export [source_db] dumpfile.txt data
-            sqlutil wipe [target_db]
-            sqlutil import dumpfile.txt [target_db]
-        source_db = [key_name | full_connection_string]
-        target_db = [key_name | full_connection_string]
-
-    wipe [target_db]
+    wipe_data [target_db]
         deletes all data in the database in proper FK order and leaves schema intact
         target_db = [key_name | full_connection_string]
 
-    add [key_name] [full_connection_string]
+    copy_data [source_db] [target_db]
+        copies data from source_db to target_db
+        this is the same as running the following commands:
+            sqlutil export_data [source_db] dumpfile.txt data
+            sqlutil wipe_data [target_db]
+            sqlutil import_data dumpfile.txt [target_db]
+        source_db = [key_name | full_connection_string]
+        target_db = [key_name | full_connection_string]
+
+    list_keys
+        lists all entries in the connections.json file
+    
+    add_key [key_name] [full_connection_string]
         adds new entry to connections.json with given key name and value.
         if entry exists, value is overwritten
 
-    remove [key_name]
+    remove_key [key_name]
         removes given entry from connections.json. does not touch corresponding database.
 
-    test [key_name | full_connection_string]
-        tests connection to db, either by looking up its key_name or using the given string as a connection string
-
-    list
-        lists all entries in the connections.json file
-    
 ");
 
         return 0;
