@@ -22,17 +22,17 @@
         }
 
         /// <summary>
-        /// Returns the value from connections.json file if given a keyname. if no entry is found, assumes keyName is the connection string and returns it.
+        /// Returns the value from connections.json file if given a keyname. if no entry is found, returns defaultValue ?? keyNameOrConnString. Never returns null.
         /// </summary>
         /// <param name="keyNameOrConnString"></param>
         /// <returns></returns>
-        public static string Get(string keyNameOrConnString)
+        public static string Get(string keyNameOrConnString, string? defaultValue = null)
         {
-            if (__connections.TryGetValue(keyNameOrConnString, out string value))
+            if (__connections.TryGetValue(keyNameOrConnString, out string? value))
             {
-                return value;
+                return value ?? defaultValue ?? keyNameOrConnString;
             }
-            return keyNameOrConnString;
+            return defaultValue ?? keyNameOrConnString;
         }
 
         /// <summary>

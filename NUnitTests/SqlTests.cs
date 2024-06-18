@@ -4,7 +4,7 @@ using sqlutil;
 namespace NUnitTests
 {
     [TestFixture]
-    public class Tests
+    public class SqlTests
     {
         private static string _srcDb = "";
         private static string _tgtDb = "";
