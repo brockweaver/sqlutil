@@ -26,13 +26,19 @@
         /// </summary>
         /// <param name="keyNameOrConnString"></param>
         /// <returns></returns>
-        public static string Get(string keyNameOrConnString, string? defaultValue = null)
+        public static string Get(string keyNameOrConnString)
         {
+            if (keyNameOrConnString.Contains(';') || keyNameOrConnString.Contains('='))
+            {
+                // assume a connection string.
+                return keyNameOrConnString;
+            }
+
             if (__connections.TryGetValue(keyNameOrConnString, out string? value))
             {
-                return value ?? defaultValue ?? keyNameOrConnString;
+                return value!;
             }
-            return defaultValue ?? keyNameOrConnString;
+            throw new InvalidOperationException($"Key named '{keyNameOrConnString}' was not found.");
         }
 
         /// <summary>
@@ -42,6 +48,10 @@
         /// <param name="value"></param>
         public static void Add(string keyName, string value)
         {
+            if (keyName.Contains(';') || keyName.Contains('='))
+            {
+                throw new InvalidOperationException($"Key name cannot contain ';' or '='");
+            }
             __connections[keyName.ToLower()] = value;
             Conn.Save();
         }

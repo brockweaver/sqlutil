@@ -37,11 +37,11 @@ public static class Program
         // sqlutil wipe [key_name | db_conn]
         if (arg0.ToLower() == "wipe_data")
         {
-            var dbConn = Conn.Get(arg1);
             try
             {
+                var dbConn = Conn.Get(arg1);
                 Console.WriteLine($"=> Wiping all data from {dbConn}...");
-                Data.Wipe(dbConn);
+                Data.Wipe(dbConn, Console.Out);
                 Console.WriteLine($"==> Wipe success!");
             }
             catch (Exception ex)
@@ -56,19 +56,26 @@ public static class Program
         if (arg0.ToLower() == "remove_key")
         {
             Console.WriteLine($"=> Removing {arg1}...");
-            if (Conn.Remove(arg1))
+            try
+            {
+                Conn.Remove(arg1);
                 Console.WriteLine($"==> Removed key {arg1}");
-            else
-                Console.WriteLine($"==> Key {arg1} not found");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"==> Key {arg1} not found. Error: {ex.Message}");
+                return 7;
+            }
+
             return 0;
         }
 
-        // sqlutil test [key_name | db_conn]
+        // sqlutil test_connection [key_name | db_conn]
         if (arg0.ToLower() == "test_connection")
         {
-            var dbConn = Conn.Get(arg1);
             try
             {
+                var dbConn = Conn.Get(arg1);
                 Console.WriteLine($"=> Testing connection to {dbConn}...");
                 Sql.TestConnection(dbConn);
                 Console.WriteLine($"==> Connection success!");
@@ -76,6 +83,26 @@ public static class Program
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"==> Connection failed: {ex.Message}");
+                return 1;
+            }
+            return 0;
+        }
+
+        // sqlutil list_tables [key_name | db_conn]
+        if (arg0.ToLower() == "list_tables")
+        {
+            try
+            {
+                var dbConn = Conn.Get(arg1);
+                var tables = Data.ListTablesInFKOrder(dbConn);
+                foreach (var t in tables)
+                {
+                    Console.WriteLine($"[{t.SchemaName}].[{t.TableName}]");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"==> list_tables failed: {ex.Message}");
                 return 1;
             }
             return 0;
@@ -91,30 +118,37 @@ public static class Program
         // sqlutil add [key_name] [value]
         if (arg0.ToLower() == "add_key")
         {
-            Console.WriteLine($"=> Adding key {arg1} = {arg2} ...");
-            Conn.Add(arg1, arg2);
-            Console.WriteLine($"==> Added key {arg0}");
+            try
+            {
+                Conn.Add(arg1, arg2);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"==> add key failed: {ex.Message}");
+                return 8;
+            }
             return 0;
         }
 
         // sqlutil export [src_key | src_conn_str] [output_file_path]
         if (arg0.ToLower() == "export_data")
         {
-            var sourceDb = Conn.Get(arg1);
-            var filePath = arg2;
-
-            // if output file already exists, trash it first
-            if (File.Exists(filePath))
-                File.Delete(filePath);
 
             try
             {
+                var sourceDb = Conn.Get(arg1);
+                var filePath = arg2;
+
+                // if output file already exists, trash it first
+                if (File.Exists(filePath))
+                    File.Delete(filePath);
+
                 Console.WriteLine($"=> Testing connection to {sourceDb}...");
                 Sql.TestConnection(sourceDb);
                 Console.WriteLine($"==> Connection success!");
 
                 Console.WriteLine($"=> Begin exporting data from {sourceDb} to {filePath} ...");
-                Data.Export(sourceDb, filePath);
+                Data.Export(sourceDb, filePath, Console.Out);
                 Console.WriteLine($"==> Done exporting data from {sourceDb} to {filePath}.");
             }
             catch (Exception ex)
@@ -130,12 +164,12 @@ public static class Program
         // sqlutil import [input_file_path] [tgt_key | tgt_conn_str]
         if (arg0.ToLower() == "import_data")
         {
-            var filePath = arg1;
-            var targetDb = Conn.Get(arg2);
-
 
             try
             {
+                var filePath = arg1;
+                var targetDb = Conn.Get(arg2);
+
                 // if input file doesn't exist, bomb
                 if (!File.Exists(filePath))
                     throw new InvalidOperationException($"No file found at {filePath}");
@@ -145,7 +179,7 @@ public static class Program
                 Console.WriteLine($"==> Connection success!");
 
                 Console.WriteLine($"=> Begin importing data from {filePath} to {targetDb} ...");
-                Data.Import(filePath, targetDb);
+                Data.Import(filePath, targetDb, Console.Out);
                 Console.WriteLine($"==> Done importing data from {filePath} to {targetDb}.");
 
             }
@@ -163,12 +197,13 @@ public static class Program
         // sqlutil copy [src_key | src_conn_str] [tgt_key | tgt_conn_str]
         if (arg0.ToLower() == "copy_data")
         {
-            var sourceDb = Conn.Get(arg1);
-            var targetDb = Conn.Get(arg2);
-            var filePath = Path.GetTempFileName();
 
             try
             {
+                var sourceDb = Conn.Get(arg1);
+                var targetDb = Conn.Get(arg2);
+                var filePath = Path.GetTempFileName();
+
                 Console.WriteLine($"=> Testing connection to {sourceDb}...");
                 Sql.TestConnection(sourceDb);
                 Console.WriteLine($"==> Connection success!");
@@ -178,15 +213,15 @@ public static class Program
                 Console.WriteLine($"==> Connection success!");
 
                 Console.WriteLine($"=> Begin exporting data from {sourceDb} to {filePath} ...");
-                Data.Export(sourceDb, filePath);
+                Data.Export(sourceDb, filePath, Console.Out);
                 Console.WriteLine($"==> Done exporting data from {sourceDb} to {filePath}.");
 
                 Console.WriteLine($"=> Begin wiping data from {targetDb} ...");
-                Data.Wipe(targetDb);
+                Data.Wipe(targetDb, Console.Out);
                 Console.WriteLine($"==> Done wiping data from {targetDb}.");
 
                 Console.WriteLine($"=> Begin importing data from {filePath} to {targetDb} ...");
-                Data.Import(filePath, targetDb);
+                Data.Import(filePath, targetDb, Console.Out);
                 Console.WriteLine($"==> Done importing data from {filePath} to {targetDb}.");
             }
             catch (Exception ex)

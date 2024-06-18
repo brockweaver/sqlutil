@@ -52,33 +52,39 @@ order by
 ", dbConn);
         }
 
-        public static void Wipe(string targetDbConn)
+        public static void Wipe(string targetDbConn, TextWriter? output)
         {
             var tables = ListTablesInFKOrder(targetDbConn);
             tables.Reverse();
 
+            output?.WriteLine($"Found {tables.Count} tables to delete");
             foreach (var t in tables)
             {
+                output?.WriteLine($"Deleting [{t.SchemaName}].[{t.TableName}]...");
                 Sql.WriteRaw($"delete from [{t.SchemaName}].[{t.TableName}]", targetDbConn);
             }
         }
 
-        public static void Export(string sourceDbConn, string targetFilePath)
+        public static void Export(string sourceDbConn, string targetFilePath, TextWriter? output)
         {
             // init the file
             using var wtr = new StreamWriter(File.OpenWrite(targetFilePath));
 
             // get list of tables to export sorted by FK constraint hierarchy
+            output?.WriteLine("Getting list of tables in foreign key order...");
             var tables = ListTablesInFKOrder(sourceDbConn);
 
             foreach (var t in tables)
             {
+                output?.WriteLine($"[{t.SchemaName}].[{t.TableName}] : Begin export");
 
                 // get list of columns for that table
                 var columns = ListColumns(sourceDbConn, t.SchemaName, t.TableName);
 
                 var countSql = $"select count(*) from [{t.SchemaName}].[{t.TableName}]";
                 var count = (int)Sql.ReadValueRaw(countSql, sourceDbConn);
+
+                output?.WriteLine($"[{t.SchemaName}].[{t.TableName}] : Found {count} rows to export");
 
                 // generate insert into structure
                 var sbInsert = new StringBuilder($"insert into [{t.SchemaName}].[{t.TableName}] (");
@@ -100,6 +106,9 @@ order by
                     wtr.WriteLine("------------------------------------------------------------------------------");
                     wtr.WriteLine("GO -- SQL_BATCH -- No rows in table");
                     wtr.WriteLine();
+
+                    output?.WriteLine($"[{t.SchemaName}].[{t.TableName}] : No rows to export");
+
                 }
                 else
                 {
@@ -117,7 +126,10 @@ order by
                             // combine 100 rows into a single insert statement
                             wtr.WriteLine();
                             if (rowNumber > 0)
+                            {
                                 wtr.WriteLine($"GO -- SQL_BATCH -- {rowNumber} rows in batch");
+                                output?.WriteLine($"[{t.SchemaName}].[{t.TableName}] : Exported {totalRows} rows");
+                            }
                             rowNumber = 0;
 
                             wtr.WriteLine(insertStatement);
@@ -127,8 +139,8 @@ order by
                             wtr.WriteLine(",");
                         }
 
-                        var outputLine = CreateValuesList(item);
-                        wtr.Write(outputLine);
+                        var fileLine = CreateValuesList(item);
+                        wtr.Write(fileLine);
                         rowNumber++;
                         totalRows++;
 
@@ -142,6 +154,7 @@ order by
                     wtr.WriteLine($"GO -- SQL_BATCH -- {rowNumber} rows in batch, {totalRows} total rows");
                     wtr.WriteLine();
 
+                    output?.WriteLine($"[{t.SchemaName}].[{t.TableName}] : Exported a total of {totalRows} rows");
                 }
 
             }
@@ -201,22 +214,39 @@ order by
 drop table if exists #tables
 create table #tables (table_schema varchar(50), table_name varchar(50), foreign_key_count int, sort_order int)
 
+-- first pull all tables who have no foreign keys defined on them
 insert into #tables (table_schema, table_name, foreign_key_count, sort_order) 
-select table_schema, table_name, sum(case when constraint_type = 'FOREIGN KEY' then 1 else 0 end) as Foreign_key_count, 0 as sort_order
-from information_schema.TABLE_CONSTRAINTS group by table_schema, table_name order by sum(case when constraint_type = 'FOREIGN KEY' then 1 else 0 end) , table_schema, table_name
+select  --*,
+    table_schema, 
+    table_name, 
+    0, 
+    -1
+from information_schema.TABLES t
+where t.table_schema not in ('sys')
+	and t.table_type in ('BASE TABLE')
+    and not exists (select top 1 1 from information_schema.TABLE_CONSTRAINTS tc where t.table_schema = tc.table_schema and t.table_name = tc.table_name and tc.constraint_type = 'FOREIGN KEY')
+order by table_schema, table_name
 
-if (select count(*) from #tables) = 0
-begin
-    -- no tables have any FK values. weird but ok.
-    -- just pull in all tables defined in the schema.
 
-    insert into #tables (table_schema, table_name, foreign_key_count, sort_order) 
-    select table_schema, table_name, 0, 0
-    from information_schema.TABLES t
-    order by table_schema, table_name
+--select * from information_schema.TABLE_CONSTRAINTS tc where tc.table_name = 'flight'
 
-end
-
+-- now pull all tables that DO have foreign keys and count how many they have (we'll need that later)
+insert into #tables (table_schema, table_name, foreign_key_count, sort_order) 
+select 
+    tc.table_schema, 
+    tc.table_name, 
+    sum(case when tc.constraint_type = 'FOREIGN KEY' then 1 else 0 end) as Foreign_key_count, 
+	0 as sort_order
+from information_schema.TABLE_CONSTRAINTS tc
+where 
+    not exists (select top 1 1 from #tables t where tc.table_schema = t.table_schema and tc.table_name = t.table_name)
+group by 
+    tc.table_schema, 
+    tc.table_name 
+order by 
+    sum(case when tc.constraint_type = 'FOREIGN KEY' then 1 else 0 end) , 
+    tc.table_schema, 
+    tc.table_name
 
 -- base case: tables that do not point at any other tables
 update #tables set sort_order = 1 where foreign_key_count = 0
@@ -248,6 +278,9 @@ join information_schema.TABLE_CONSTRAINTS tcfk
 order by t1.table_schema, t1.table_name
 
 
+--select * from #tables
+--select * from #table_refs
+
 --select * from #tables where sort_order > 0 order by sort_order, table_schema, table_name
 --select * from #tables order by sort_order, table_schema, table_name
 --select * from #table_refs order by sort_order, table_schema, table_name
@@ -255,7 +288,7 @@ order by t1.table_schema, t1.table_name
 
 declare @i int = 2
 declare @rows int = 1
-while @rows > 0 and @i < 50
+while @rows > 0 and @i < 100
 begin
 
 	update tr set
@@ -287,9 +320,18 @@ begin
 end
 
 select 
+	--*
 	table_schema as [schema_name],
-	table_name as [table_name]
+	table_name as [table_name],
+	sort_order as [cardinality]
 from #tables order by sort_order, table_schema, table_name
+
+--select * from #table_refs tr1
+--join #table_refs tr2
+--	on tr1.fk_table_schema = tr2.table_schema
+--	and tr1.fk_table_name = tr2.table_name
+--	and tr2.fk_table_schema = tr1.table_schema
+--	and tr2.fk_table_name = tr1.table_name
 
 
 ", dbConn);
@@ -297,7 +339,7 @@ from #tables order by sort_order, table_schema, table_name
         }
 
 
-        public static void Import(string sourceFilePath, string targetDbConn)
+        public static void Import(string sourceFilePath, string targetDbConn, TextWriter? output)
         {
             // open file
             var rdr = new StreamReader(File.OpenRead(sourceFilePath));
@@ -305,20 +347,24 @@ from #tables order by sort_order, table_schema, table_name
             // read each line for entire file
             var sb = new StringBuilder();
             var line = "";
-            var batch = 0;
+            var batch = 1;
+            var fullTableName = "";
             while (line != null)
             {
                 line = rdr.ReadLine();
                 if (line?.StartsWith("-- Begin table:") == true)
                 {
-                    Console.WriteLine(line);
+                    fullTableName = line.Replace("-- Begin table:", "").Trim();
+                    output?.WriteLine($"{fullTableName} : Begin data import");
                     batch = 0;
                 }
 
-                if (line == null || line.StartsWith("GO -- SQL_BATCH --"))
+                if (line?.StartsWith("GO -- SQL_BATCH --") == true)
                 {
                     // we have a chunk of sql we need to run, let's do that now
-                    Console.WriteLine($"Writing batch {batch} ({line?.Replace("GO -- SQL_BATCH -- ", "")})...");
+                    var summary = line?.Replace("GO -- SQL_BATCH -- ", "").Replace("100 rows in batch", "");
+                    output?.WriteLine($"{fullTableName} : Wrote {batch * 100} rows {summary}");
+
                     Sql.WriteRaw(sb.ToString(), targetDbConn);
                     // reset stringbuilder for a new chunk of sql
                     sb.Clear();

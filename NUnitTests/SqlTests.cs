@@ -98,7 +98,8 @@ select * from dbo.test_1 order by id
         {
             Should.NotThrow(() =>
             {
-                Data.Export(_srcDb, _exportFile);
+                Data.Export(_srcDb, _exportFile, Console.Out);
+
                 var fi = new FileInfo(_exportFile);
                 Console.WriteLine("export file path = " + fi.FullName);
                 fi.Length.ShouldBeGreaterThan(0);
@@ -114,7 +115,7 @@ select * from dbo.test_1 order by id
         {
             Should.NotThrow(() =>
             {
-                Data.Import(_exportFile, _tgtDb);
+                Data.Import(_exportFile, _tgtDb, Console.Out);
                 Sql.ReadValue($"select count(*) from dbo.test_1", _tgtDb).ShouldBe(3);
             });
         }
@@ -126,7 +127,7 @@ select * from dbo.test_1 order by id
         {
             Should.NotThrow(() =>
             {
-                Data.Wipe(_tgtDb);
+                Data.Wipe(_tgtDb, Console.Out);
                 Sql.ReadValue($"select count(*) from dbo.test_1", _tgtDb).ShouldBe(0);
             });
         }
@@ -139,17 +140,17 @@ select * from dbo.test_1 order by id
 
             Should.NotThrow(() =>
             {
-                Data.Export(_srcDb, tempfile);
+                Data.Export(_srcDb, tempfile, Console.Out);
                 File.Exists(tempfile).ShouldBeTrue();
 
                 Sql.ReadValue($"select count(*) from dbo.test_1", _srcDb).ShouldBe(3);
                 Sql.ReadValue($"select count(*) from dbo.test_1", _tgtDb).ShouldBe(0);
 
-                Data.Wipe(_tgtDb);
+                Data.Wipe(_tgtDb, Console.Out);
                 Sql.ReadValue($"select count(*) from dbo.test_1", _srcDb).ShouldBe(3);
                 Sql.ReadValue($"select count(*) from dbo.test_1", _tgtDb).ShouldBe(0);
 
-                Data.Import(tempfile, _tgtDb);
+                Data.Import(tempfile, _tgtDb, Console.Out);
                 Sql.ReadValue($"select count(*) from dbo.test_1", _srcDb).ShouldBe(3);
                 Sql.ReadValue($"select count(*) from dbo.test_1", _tgtDb).ShouldBe(3);
 

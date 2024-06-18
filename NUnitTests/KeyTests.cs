@@ -18,20 +18,36 @@ namespace NUnitTests
         {
             Conn.List().Count.ShouldBe(2);
 
+            Should.Throw(() =>
+            {
+                Conn.Add("bad=name", "ignored");
+            }, typeof(InvalidOperationException));
+
+            Should.Throw(() =>
+            {
+                Conn.Add("bad;name", "ignored");
+            }, typeof(InvalidOperationException));
+
             Conn.Add("tempkey", "asdf");
             Conn.List().Count.ShouldBe(3);
 
             Conn.Get("tempkey").ShouldBe("asdf");
 
-            Conn.Remove("not_a_real_key");
+            Should.NotThrow(() =>
+            {
+                Conn.Remove("not_a_real_key");
+            });
+
+            Should.Throw(() =>
+            {
+                Conn.Get("invalid_key_name");
+            }, typeof(InvalidOperationException));
+
             Conn.List().Count.ShouldBe(3);
 
             Conn.Remove("tempkey");
             Conn.List().Count.ShouldBe(2);
 
-            Conn.Get("tempkey", "").ShouldBe("");
-
-            Conn.Get("conn_string would go here").ShouldBe("conn_string would go here");
         }
     }
 }
