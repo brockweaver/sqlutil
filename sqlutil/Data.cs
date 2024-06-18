@@ -3,7 +3,7 @@ using System.Text;
 
 namespace sqlutil
 {
-    internal static class Data
+    public static class Data
     {
 
         public static List<Table> ListTables(string dbConn)
@@ -204,6 +204,19 @@ create table #tables (table_schema varchar(50), table_name varchar(50), foreign_
 insert into #tables (table_schema, table_name, foreign_key_count, sort_order) 
 select table_schema, table_name, sum(case when constraint_type = 'FOREIGN KEY' then 1 else 0 end) as Foreign_key_count, 0 as sort_order
 from information_schema.TABLE_CONSTRAINTS group by table_schema, table_name order by sum(case when constraint_type = 'FOREIGN KEY' then 1 else 0 end) , table_schema, table_name
+
+if (select count(*) from #tables) = 0
+begin
+    -- no tables have any FK values. weird but ok.
+    -- just pull in all tables defined in the schema.
+
+    insert into #tables (table_schema, table_name, foreign_key_count, sort_order) 
+    select table_schema, table_name, 0, 0
+    from information_schema.TABLES t
+    order by table_schema, table_name
+
+end
+
 
 -- base case: tables that do not point at any other tables
 update #tables set sort_order = 1 where foreign_key_count = 0

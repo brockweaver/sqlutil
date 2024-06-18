@@ -1,0 +1,4 @@
+{
+  "src_db": "Data Source=(localdb)\\ProjectModels;Initial Catalog=sqlutil_source;Integrated Security=True",
+  "tgt_db": "Data Source=(localdb)\\ProjectModels;Initial Catalog=sqlutil_target;Integrated Security=True"
+}

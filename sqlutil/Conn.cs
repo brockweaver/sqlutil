@@ -1,6 +1,6 @@
 ﻿namespace sqlutil
 {
-    internal static class Conn
+    public static class Conn
     {
         private static Dictionary<string, string> __connections = new Dictionary<string, string>();
 

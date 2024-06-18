@@ -1,6 +1,6 @@
 ﻿namespace sqlutil.Models
 {
-    internal class ForeignKey
+    public class ForeignKey
     {
         public string? Name { get; set; }
         public Table? SourceTable { get; set; }

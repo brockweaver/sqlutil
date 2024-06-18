@@ -1,6 +1,6 @@
 ﻿namespace sqlutil.Models
 {
-    internal class Column
+    public class Column
     {
         public string Name { get; set; } = "";
         public string CombinedDataType { get; set; } = "";

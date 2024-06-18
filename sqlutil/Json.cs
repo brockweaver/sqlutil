@@ -2,7 +2,7 @@
 
 namespace sqlutil
 {
-    internal class Json
+    public class Json
     {
         public static string Stringify(object o)
         {

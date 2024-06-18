@@ -3,7 +3,7 @@ using System.Reflection;
 
 namespace sqlutil
 {
-    internal static class Sql
+    public static class Sql
     {
         public static int WriteRaw(string sql, string dbConn)
         {
