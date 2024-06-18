@@ -102,6 +102,8 @@ select * from dbo.test_1 order by id
                 var fi = new FileInfo(_exportFile);
                 Console.WriteLine("export file path = " + fi.FullName);
                 fi.Length.ShouldBeGreaterThan(0);
+                Sql.ReadValue($"select count(*) from dbo.test_1", _srcDb).ShouldBe(3);
+                Sql.ReadValue($"select count(*) from dbo.test_1", _tgtDb).ShouldBe(0);
             });
         }
 
