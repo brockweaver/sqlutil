@@ -234,6 +234,32 @@ public static class Program
 
         }
 
+        if (arg0.ToLower() == "upload_data")
+        {
+            try
+            {
+                var csvFilePath = arg1;
+                if (!File.Exists(csvFilePath))
+                    throw new InvalidOperationException($"No file found at {csvFilePath}");
+
+                var targetDb = Conn.Get(arg2);
+
+                Console.WriteLine($"=> Testing connection to {targetDb}...");
+                Sql.TestConnection(targetDb);
+                Console.WriteLine($"==> Connection success!");
+
+                Console.WriteLine($"=> Uploading data from {Path.GetFileName(csvFilePath)} to {targetDb}...");
+                Data.Upload(csvFilePath, targetDb, Console.Out);
+                Console.WriteLine($"==> Done uploading data from {csvFilePath} to {targetDb}.");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"==> upload_data failed: {ex.Message}");
+                return 1;
+            }
+            return 0;
+        }
+
 
         // none of the above.
         return Help();
@@ -267,6 +293,10 @@ sqlutil <cmd> [options]
             sqlutil wipe_data [target_db]
             sqlutil import_data dumpfile.txt [target_db]
         source_db = [key_name | full_connection_string]
+        target_db = [key_name | full_connection_string]
+
+    upload_data [csv_file_path] [target_db]
+        reads csv file and creates a new table to hold its data and 
         target_db = [key_name | full_connection_string]
 
     list_keys

@@ -1,4 +1,5 @@
-﻿using sqlutil.Models;
+﻿using Microsoft.VisualBasic.FileIO;
+using sqlutil.Models;
 using System.Text;
 
 namespace sqlutil
@@ -378,6 +379,128 @@ from #tables order by sort_order, table_schema, table_name
 
         }
 
+        public static void Upload(string csvFilePath, string targetDbConn, TextWriter? output)
+        {
+            var parser = new TextFieldParser(csvFilePath);
+            parser.TextFieldType = FieldType.Delimited;
+            parser.SetDelimiters(new string[] { "," });
+
+            var tableName = Path.GetFileNameWithoutExtension(csvFilePath);
+            var columns = new List<Column>();
+
+            var insertStatement = "";
+
+            var rowCount = 0;
+
+            while (!parser.EndOfData)
+            {
+                var row = parser.ReadFields();
+                if (row != null)
+                {
+                    if (columns.Count == 0)
+                    {
+                        // we always assume first line is column names
+                        foreach (var item in row)
+                        {
+                            columns.Add(new Column { Name = item.Replace("[", "").Replace("]", "") });
+                        }
+                    }
+                    else
+                    {
+                        if (columns[0].CombinedDataType == "")
+                        {
+                            // first line of "real" data. this will determine the data type of the column in the database table.
+                            for (var i = 0; i < columns.Count; i++)
+                            {
+                                var c = columns[i];
+                                c.DeriveTypeInfo(row[i]);
+                            }
+
+                            // now we need to defin and create that table
+                            var createSql = CreateTableStatement(tableName, columns);
+                            Sql.WriteRaw($@"
+drop table if exists [dbo].[{tableName}];
+", targetDbConn);
+                            Sql.WriteRaw(createSql, targetDbConn);
+                            output?.WriteLine($"Created table [dbo].[{tableName}]");
+
+                            var colNames = String.Join(", ", columns.Select(c => "[" + c.Name + "]"));
+                            insertStatement = $"insert into [dbo].[{tableName}] ({colNames}) values (__VALS__)";
+                        }
+
+                        // create a valid insert statment and run it (once for each row, no transaction)
+                        var insertSql = FormatInsert(insertStatement, columns, row);
+                        Sql.WriteRaw(insertSql, targetDbConn);
+
+                        if (rowCount % 100 == 0)
+                        {
+                            output?.WriteLine($"[dbo].[{tableName}] : Inserted {rowCount} rows");
+                        }
+                    }
+                }
+
+                rowCount++;
+            }
+        }
+
+        private static string CreateTableStatement(string tableName, List<Column> columns)
+        {
+            var sql = $@"
+create table [dbo].[{tableName}] (
+    __COLS__
+)
+";
+            var cols = new List<string>();
+            foreach (var c in columns)
+            {
+                cols.Add($"[{c.Name}] {c.CombinedDataType}\n\t");
+            }
+            sql = sql.Replace("__COLS__", String.Join(", ", cols));
+
+            return sql;
+
+        }
+
+
+        private static string FormatInsert(string insert, List<Column> columns, string[] row)
+        {
+            var values = new List<string>();
+            for (var i = 0; i < columns.Count; i++)
+            {
+                var c = columns[i];
+                var val = row[i];
+                if (val == null || val == "")
+                {
+                    // null or empty is always the same as null
+                    values.Add("null");
+                }
+                else if (c.Type == typeof(bool))
+                {
+                    values.Add(val?.ToLower() == "true" ||
+                                val?.ToLower() == "y" ||
+                                val?.ToLower() == "yes" ||
+                                val?.ToLower() == "1" ?
+                                "1" : "0");
+                }
+                else if (
+                    c.Type == typeof(decimal) ||
+                    c.Type == typeof(long))
+                {
+                    // bool or number, assume no string
+                    values.Add(val);
+                }
+                else
+                {
+                    // guid, string, datetime, etc.
+                    // assume we need to use quotes
+                    values.Add("'" + val?.Replace("'", "''") + "'");
+                }
+
+            }
+
+            var rv = insert.Replace("__VALS__", String.Join(", ", values));
+            return rv;
+        }
 
     }
 }

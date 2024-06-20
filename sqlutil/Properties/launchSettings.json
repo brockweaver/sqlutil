@@ -2,7 +2,7 @@
   "profiles": {
     "sqlutil": {
       "commandName": "Project",
-      "commandLineArgs": "export src_db exported.txt"
+      "commandLineArgs": "upload_data \"C:\\Users\\brock\\Downloads\\Jester Men's League 2024 Results - 06-13 Weekly.csv\" tgt_db"
     }
   }
 }
